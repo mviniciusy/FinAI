@@ -12,4 +12,4 @@ finai-backend/.env
 *.pyc 
 
 # Ignorar a pasta "Documentos" e seu conteúdo
-1 documentos-ref-priv/
+Documentos/ 
