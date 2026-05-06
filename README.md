@@ -358,7 +358,3 @@ FinAI/
 ## 📄 Licença
 
 Projeto privado. Todos os direitos reservados.
-
----
-
-*FinAI — Porque sua inteligência financeira deveria começar onde suas transações terminam: no e-mail.* 📧💰
