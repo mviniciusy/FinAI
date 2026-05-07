@@ -12,6 +12,8 @@
 - [VM Docker Host](#vm-docker-host)
 - [Armazenamento e Persistência](#armazenamento-e-persistência)
 - [Arquitetura de Dados](#arquitetura-de-dados)
+- [Precisão da Captura por Banco](#-precisão-da-captura-por-banco)
+- [Gestão de Parcelamentos](#-gestão-de-parcelamentos)
 - [Data Pipeline](#data-pipeline)
 - [Camada de IA Híbrida](#camada-de-ia-híbrida)
 - [Segurança](#segurança)
@@ -223,7 +225,19 @@ erDiagram
         timestamp updated_at
     }
 
+    PARCELAMENTO {
+        uuid id PK
+        string descricao
+        float valor_parcela
+        int total_parcelas
+        int parcela_atual
+        date data_inicio
+        uuid card_id FK
+        timestamp created_at
+    }
+
     CARD ||--o{ TRANSACTION : has
+    CARD ||--o{ PARCELAMENTO : has
 ```
 
 ### Tabela `transaction`
@@ -258,21 +272,83 @@ erDiagram
 | `key` | VARCHAR | Chave única da configuração |
 | `value` | VARCHAR | Valor da configuração |
 
+### Tabela `parcelamento`
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `id` | UUID | Identificador único |
+| `descricao` | VARCHAR | Descrição da compra (ex: "Monitor 27 polegadas") |
+| `valor_parcela` | FLOAT | Valor de cada parcela individual |
+| `total_parcelas` | INT | Número total de parcelas |
+| `parcela_atual` | INT | Parcela atual (incrementada mensalmente) |
+| `data_inicio` | DATE | Data da primeira parcela |
+| `card_id` | UUID | Chave estrangeira para a tabela `card` |
+| `created_at` | TIMESTAMP | Data de inserção no sistema |
+
+---
+
+## 📬 Precisão da Captura por Banco
+
+A precisão da ingestão de transações via IMAP varia conforme o comportamento de notificação de cada instituição financeira:
+
+| Banco | Precisão | Comportamento |
+|-------|----------|--------------|
+| **Inter** | 🟢 Alta | Envia e-mails detalhados (valor, data, estabelecimento) para quase todas as operações |
+| **Mercado Pago** | 🟢 Alta | Envia e-mails detalhados (valor, data, estabelecimento) para quase todas as operações |
+| **Nubank** | 🟡 Parcial | Foco em notificações Push no celular. E-mail garantido para Pix, falha em compras pequenas no crédito |
+| **PicPay** | 🟡 Parcial | Foco em notificações Push no celular. E-mail garantido para Pix, falha em compras pequenas no crédito |
+
+### Estratégia de Contorno
+
+Para compensar as limitações do Nubank e PicPay:
+
+1. **Parser da Fatura Fechada:** O extrator processa o e-mail de resumo mensal da fatura, capturando todas as transações do período de uma só vez.
+2. **Lançamento Rápido (PWA):** Botão no WebApp para inserção manual de gastos não notificados.
+
+---
+
+## 💳 Gestão de Parcelamentos
+
+E-mails de confirmação de compra parcelada ocorrem apenas no momento da transação e **não se repetem mensalmente**. A solução adotada é:
+
+- **Registro Manual:** Usuário cadastra compras parceladas no PWA (ex: "Monitor, R$ 1.000 em 10x")
+- **Projeção por IA:** O modelo "O Analista" (NVIDIA NIM) utiliza os parcelamentos para projetar faturas futuras
+
+### Fontes de Dados do Pipeline
+
+O sistema aceita duas fontes de dados:
+
+| Fonte | Gatilho | Fluxo |
+|-------|---------|-------|
+| **IMAP (E-mail)** | Novo e-mail na caixa de entrada | Extract → Transform → Load |
+| **Lançamento Manual (PWA)** | Usuário preenche formulário no app | Load direto (dados já estruturados) |
+
 ---
 
 ## Data Pipeline
 
-O fluxo do dado segue o modelo **ETL (Extract, Transform, Load)** com uma camada adicional de **Analyze**:
+O fluxo do dado segue o modelo **ETL (Extract, Transform, Load)** com uma camada adicional de **Analyze**. O sistema aceita duas fontes de dados distintas:
 
 ```mermaid
 flowchart LR
-    A["IMAP Inbox"] -->|"Novo e-mail"| B["Extract<br/>Python imaplib"]
+    subgraph Fontes["Fontes de Dados"]
+        A["IMAP Inbox"] -->|"Novo e-mail"| B["Extract<br/>Python imaplib"]
+        H["Lançamento Manual<br/>PWA"] -->|"Input do usuário"| D
+    end
+
     B -->|"Corpo bruto"| C["Transform<br/>IA / Regex"]
     C -->|"JSON estruturado"| D["Load<br/>PostgreSQL"]
     D -->|"Dados persistidos"| E["Analyze<br/>FastAPI + AI"]
     E -->|"Insights"| F["PWA Dashboard"]
     E -->|"Respostas NL"| G["PWA Chat"]
 ```
+
+### Fontes de Dados
+
+| Fonte | Gatilho | Processamento |
+|-------|---------|--------------|
+| **IMAP (E-mail)** | Novo e-mail na caixa de entrada | Extract → Transform → Load |
+| **Lançamento Manual (PWA)** | Usuário preenche formulário no app | Load direto (dados já estruturados) |
 
 ### Detalhamento das Etapas
 

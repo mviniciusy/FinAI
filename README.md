@@ -53,6 +53,8 @@ O sistema **não armazena credenciais bancárias** — apenas conecta ao e-mail 
 | **Dashboard** | Visualização em tempo real de gastos vs. limite disponível |
 | **Chat Financeiro** | Consultas em linguagem natural sobre os dados armazenados |
 | **PWA** | WebApp instalável no celular com experiência nativa (standalone) |
+| **Lançamento Manual** | Botão "Lançamento Rápido" para inserir gastos não capturados por e-mail |
+| **Parcelamentos** | Registro de compras parceladas com projeção de faturas futuras via IA |
 
 ---
 
@@ -127,6 +129,55 @@ O sistema **não abre portas no roteador**. A comunicação externa (WebApp PWA)
 
 ---
 
+## 📬 Estratégia de Captura de Dados por Banco
+
+A precisão da ingestão de transações depende do comportamento de notificação de cada instituição financeira. Mapeamos os seguintes padrões:
+
+| Banco | Precisão da Captura | Comportamento |
+|-------|-------------------|--------------|
+| **Inter** | 🟢 Alta | Envia e-mails detalhados (valor, data, estabelecimento) para quase todas as operações |
+| **Mercado Pago** | 🟢 Alta | Envia e-mails detalhados (valor, data, estabelecimento) para quase todas as operações |
+| **Nubank** | 🟡 Parcial | Foco em notificações Push no celular. E-mail garantido para transações Pix, mas pode falhar em compras pequenas no crédito |
+| **PicPay** | 🟡 Parcial | Foco em notificações Push no celular. E-mail garantido para transações Pix, mas pode falhar em compras pequenas no crédito |
+
+### Solução de Contorno
+
+Para compensar as limitações do Nubank e PicPay, duas estratégias complementares foram adotadas:
+
+1. **Parser da Fatura Fechada:** O extrator será configurado para realizar o parsing do e-mail de "Fatura Fechada" (resumo mensal), capturando todas as transações do período de uma só vez.
+
+2. **Lançamento Rápido:** O WebApp PWA contará com um botão de "Lançamento Rápido" para inserção manual de gastos não notificados, garantindo que nenhuma transação fique de fora.
+
+---
+
+## 💳 Gestão de Parcelamentos e Entradas Manuais
+
+E-mails de confirmação de compra parcelada ocorrem apenas no momento da transação e **não se repetem mensalmente**. Para lidar com isso, adotamos uma solução híbrida:
+
+### Solução Híbrida
+
+| Componente | Descrição |
+|-----------|-----------|
+| **Registro Manual** | O usuário registrará compras parceladas manualmente no PWA (ex: "Monitor, R$ 1.000 em 10x") |
+| **Projeção por IA** | O modelo "O Analista" (NVIDIA NIM) utilizará esses dados para projetar faturas futuras, respondendo a prompts como *"Quanto terei de fatura em agosto?"* |
+
+### Nova Tabela: `parcelamentos`
+
+Para suportar esta funcionalidade, foi adicionada a tabela `parcelamentos` na modelagem do PostgreSQL:
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `id` | UUID | Identificador único |
+| `descricao` | VARCHAR | Descrição da compra (ex: "Monitor 27 polegadas") |
+| `valor_parcela` | FLOAT | Valor de cada parcela individual |
+| `total_parcelas` | INT | Número total de parcelas |
+| `parcela_atual` | INT | Parcela atual (incrementada mensalmente) |
+| `data_inicio` | DATE | Data da primeira parcela |
+| `card_id` | UUID | Chave estrangeira para a tabela `card` |
+| `created_at` | TIMESTAMP | Data de inserção no sistema |
+
+---
+
 ## 🧠 IA Híbrida
 
 O FinAI utiliza uma abordagem híbrida para otimizar **latência, custo e precisão**, dividindo o processamento entre a nuvem (NVIDIA NIM) e o local (Ollama com GPU RTX 3060 12GB):
@@ -180,17 +231,30 @@ flowchart TB
 
 ## 📊 Data Pipeline
 
-O fluxo do dado segue o modelo **ETL (Extract, Transform, Load)** com uma camada adicional de **Analyze**:
+O fluxo do dado segue o modelo **ETL (Extract, Transform, Load)** com uma camada adicional de **Analyze**. O sistema aceita duas fontes de dados distintas:
 
 ```mermaid
 flowchart LR
-    A["IMAP Inbox"] -->|"Novo e-mail"| B["Extract<br/>Python imaplib"]
+    subgraph Fontes["Fontes de Dados"]
+        A["IMAP Inbox"] -->|"Novo e-mail"| B["Extract<br/>Python imaplib"]
+        H["Lançamento Manual<br/>PWA"] -->|"Input do usuário"| D
+    end
+
     B -->|"Corpo bruto"| C["Transform<br/>IA / Regex"]
     C -->|"JSON estruturado"| D["Load<br/>PostgreSQL"]
     D -->|"Dados persistidos"| E["Analyze<br/>FastAPI + AI"]
     E -->|"Insights"| F["PWA Dashboard"]
     E -->|"Respostas NL"| G["PWA Chat"]
 ```
+
+### Fontes de Dados
+
+| Fonte | Gatilho | Processamento |
+|-------|---------|--------------|
+| **IMAP (E-mail)** | Novo e-mail na caixa de entrada | Extract → Transform → Load |
+| **Lançamento Manual (PWA)** | Usuário preenche formulário no app | Load direto (dados já estruturados) |
+
+### Etapas do Pipeline
 
 | Etapa | Descrição | Tecnologia |
 |-------|-----------|------------|
@@ -301,11 +365,13 @@ FinAI/
 - [ ] Keep-alive e reconexão automática
 - [ ] Filtros de segurança (whitelist de domínios bancários)
 - [ ] Parsers iniciais para **Nubank** e **Inter**
+- [ ] Parser de **Fatura Fechada** (resumo mensal) para Nubank e PicPay
 - [ ] Extração de dados: valor, data, estabelecimento, tipo de transação
 - [ ] Testes unitários com e-mails reais anonimizados
 
 ### Fase 2: O Alicerce de Dados
-- [ ] Modelagem do banco de dados (Tabelas de Transações, Cartões e Configurações)
+- [ ] Modelagem do banco de dados (Tabelas de Transações, Cartões, Configurações e Parcelamentos)
+- [ ] Tabela `parcelamentos`: id, descricao, valor_parcela, total_parcelas, parcela_atual, data_inicio, card_id, created_at
 - [ ] Implementação da lógica de deduplicação (hash SHA-256 do Message-ID)
 - [ ] Migrations com Alembic
 - [ ] Índices e constraints para performance
@@ -314,11 +380,14 @@ FinAI/
 - [ ] Desenvolvimento de endpoints REST para servir o dashboard
 - [ ] Integração com o sistema de autenticação (JWT/OAuth2)
 - [ ] Endpoints de configuração (limites, datas de fechamento, vencimento)
+- [ ] Endpoints CRUD para **parcelamentos** e **lançamento rápido**
 - [ ] Webhook para notificações em tempo real (WebSocket)
 
 ### Fase 4: O WebApp PWA
 - [ ] Desenvolvimento da interface mobile-first com React + Tailwind
 - [ ] Dashboard com gráficos de gastos vs. limite
+- [ ] Componente de **Lançamento Rápido** para inserção manual de gastos
+- [ ] Interface de registro e visualização de **parcelamentos**
 - [ ] Configuração do Service Worker e Manifest para instalação mobile
 - [ ] Interface de chat financeiro integrada
 
@@ -327,6 +396,7 @@ FinAI/
 - [ ] Integração do O Classificador local (Ollama)
 - [ ] Integração do O Analista (NVIDIA NIM)
 - [ ] Pipeline de categorização automática de estabelecimentos
+- [ ] Projeção de faturas futuras com base nos **parcelamentos** registrados
 - [ ] Análise preditiva de gastos e projeções de limite
 
 ---

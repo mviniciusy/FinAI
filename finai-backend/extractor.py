@@ -10,6 +10,28 @@ EMAIL_ACCOUNT = os.getenv("EMAIL_ACCOUNT")
 EMAIL_PASSWORD = os.getenv("EMAIL_APP_PASSWORD")
 IMAP_SERVER = "imap.gmail.com"
 
+def obter_corpo_email(msg):
+    if msg.is_multipart():
+        for part in msg.walk():
+            content_type = part.get_content_type()
+            content_disposition = str(part.get("Content-Disposition"))
+            
+            if "attachment" in content_disposition:
+                continue
+                
+            if content_type == "text/plain":
+                try:
+                    return part.get_payload(decode=True).decode()
+                except:
+                    pass
+    else:
+        try:
+            return msg.get_payload(decode=True).decode()
+        except:
+            pass
+            
+    return "Corpo do e-mail não encontrado ou formato não suportado."
+
 def buscar_ultimos_emails_banco():
     print("Conectando ao IMAP...")
     
@@ -39,8 +61,13 @@ def buscar_ultimos_emails_banco():
                         if isinstance(assunto, bytes):
                             assunto = assunto.decode(encoding if encoding else "utf-8")
                             
-                        print(f"\nASSUNTO DO E-MAIL: {assunto}")
+                        corpo = obter_corpo_email(msg)
+                            
+                        print(f"\nASSUNTO: {assunto}")
                         print(f"DATA: {msg.get('Date')}")
+                        print("\n--- CORPO DO E-MAIL ---")
+                        print(corpo[:500])
+                        print("-----------------------\n")
         
         mail.logout()
 
