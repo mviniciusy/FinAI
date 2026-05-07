@@ -3,6 +3,8 @@ import imaplib
 import email
 from email.header import decode_header
 from dotenv import load_dotenv
+from bs4 import BeautifulSoup
+import re
 
 load_dotenv()
 
@@ -10,7 +12,14 @@ EMAIL_ACCOUNT = os.getenv("EMAIL_ACCOUNT")
 EMAIL_PASSWORD = os.getenv("EMAIL_APP_PASSWORD")
 IMAP_SERVER = "imap.gmail.com"
 
+def limpar_html(html_content):
+    soup = BeautifulSoup(html_content, "html.parser")
+    return soup.get_text(separator="\n", strip=True)
+
 def obter_corpo_email(msg):
+    corpo_texto = ""
+    corpo_html = ""
+
     if msg.is_multipart():
         for part in msg.walk():
             content_type = part.get_content_type()
@@ -21,16 +30,60 @@ def obter_corpo_email(msg):
                 
             if content_type == "text/plain":
                 try:
-                    return part.get_payload(decode=True).decode()
+                    corpo_texto = part.get_payload(decode=True).decode()
+                except:
+                    pass
+            elif content_type == "text/html":
+                try:
+                    corpo_html = part.get_payload(decode=True).decode()
                 except:
                     pass
     else:
+        content_type = msg.get_content_type()
         try:
-            return msg.get_payload(decode=True).decode()
+            payload = msg.get_payload(decode=True).decode()
+            if content_type == "text/html":
+                corpo_html = payload
+            else:
+                corpo_texto = payload
         except:
             pass
             
-    return "Corpo do e-mail não encontrado ou formato não suportado."
+    if corpo_texto:
+        return corpo_texto
+    elif corpo_html:
+        return limpar_html(corpo_html)
+        
+    return ""
+
+def extrair_dados_transacao(assunto, corpo, data_email):
+    transacao = {
+        "banco": "Nubank",
+        "data": data_email,
+        "tipo": "Desconhecido",
+        "valor": 0.0,
+        "estabelecimento": "N/A"
+    }
+
+    padrao_valor = r"R\$\s*(\d+(?:\.\d{3})*,\d{2})"
+    match_valor = re.search(padrao_valor, corpo)
+    
+    if match_valor:
+        valor_str = match_valor.group(1).replace(".", "").replace(",", ".")
+        transacao["valor"] = float(valor_str)
+
+    assunto_lower = assunto.lower()
+    if "pagamento de fatura" in assunto_lower:
+        transacao["tipo"] = "Pagamento de Fatura"
+        transacao["estabelecimento"] = "Nubank"
+    elif "compra aprovada" in assunto_lower:
+        transacao["tipo"] = "Compra Cartao"
+    elif "transferência enviada" in assunto_lower or "pix enviado" in assunto_lower:
+        transacao["tipo"] = "Pix Enviado"
+    elif "transferência recebida" in assunto_lower or "pix recebido" in assunto_lower:
+        transacao["tipo"] = "Pix Recebido"
+
+    return transacao
 
 def buscar_ultimos_emails_banco():
     print("Conectando ao IMAP...")
@@ -49,7 +102,7 @@ def buscar_ultimos_emails_banco():
             
             if ids_emails:
                 ultimo_id = ids_emails[-1]
-                print(f"Baixando o e-mail mais recente (ID: {ultimo_id.decode()})...")
+                print(f"Processando o e-mail mais recente (ID: {ultimo_id.decode()})...")
                 
                 status_fetch, dados_email = mail.fetch(ultimo_id, "(RFC822)")
                 
@@ -62,12 +115,13 @@ def buscar_ultimos_emails_banco():
                             assunto = assunto.decode(encoding if encoding else "utf-8")
                             
                         corpo = obter_corpo_email(msg)
-                            
-                        print(f"\nASSUNTO: {assunto}")
-                        print(f"DATA: {msg.get('Date')}")
-                        print("\n--- CORPO DO E-MAIL ---")
-                        print(corpo[:500])
-                        print("-----------------------\n")
+                        data_email = msg.get("Date")
+                        
+                        dados_estruturados = extrair_dados_transacao(assunto, corpo, data_email)
+                        
+                        print("\n--- DADOS ESTRUTURADOS (JSON) ---")
+                        print(dados_estruturados)
+                        print("---------------------------------\n")
         
         mail.logout()
 
