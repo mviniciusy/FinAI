@@ -73,9 +73,19 @@ def extrair_dados_transacao(assunto, corpo, data_email):
         transacao["valor"] = float(valor_str)
 
     assunto_lower = assunto.lower()
+    corpo_lower = corpo.lower()
+
     if "pagamento de fatura" in assunto_lower:
         transacao["tipo"] = "Pagamento de Fatura"
         transacao["estabelecimento"] = "Nubank"
+    elif "sua fatura" in assunto_lower:
+        if "não precisa pagar nada" in corpo_lower or "nao precisa pagar nada" in corpo_lower:
+            transacao["tipo"] = "Fatura Zerada"
+            transacao["estabelecimento"] = "Nubank"
+            transacao["valor"] = 0.0
+        else:
+            transacao["tipo"] = "Fechamento de Fatura"
+            transacao["estabelecimento"] = "Nubank"
     elif "compra aprovada" in assunto_lower:
         transacao["tipo"] = "Compra Cartao"
     elif "transferência enviada" in assunto_lower or "pix enviado" in assunto_lower:
