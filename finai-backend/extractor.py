@@ -111,27 +111,28 @@ def buscar_ultimos_emails_banco():
             print(f"Encontrados {len(ids_emails)} e-mails do Nubank.")
             
             if ids_emails:
-                ultimo_id = ids_emails[-1]
-                print(f"Processando o e-mail mais recente (ID: {ultimo_id.decode()})...")
+                ultimos_ids = ids_emails[-5:]
+                print(f"Processando os ultimos {len(ultimos_ids)} e-mails...\n")
                 
-                status_fetch, dados_email = mail.fetch(ultimo_id, "(RFC822)")
-                
-                for resposta in dados_email:
-                    if isinstance(resposta, tuple):
-                        msg = email.message_from_bytes(resposta[1])
-                        
-                        assunto, encoding = decode_header(msg["Subject"])[0]
-                        if isinstance(assunto, bytes):
-                            assunto = assunto.decode(encoding if encoding else "utf-8")
+                for email_id in ultimos_ids:
+                    status_fetch, dados_email = mail.fetch(email_id, "(RFC822)")
+                    
+                    for resposta in dados_email:
+                        if isinstance(resposta, tuple):
+                            msg = email.message_from_bytes(resposta[1])
                             
-                        corpo = obter_corpo_email(msg)
-                        data_email = msg.get("Date")
-                        
-                        dados_estruturados = extrair_dados_transacao(assunto, corpo, data_email)
-                        
-                        print("\n--- DADOS ESTRUTURADOS (JSON) ---")
-                        print(dados_estruturados)
-                        print("---------------------------------\n")
+                            assunto, encoding = decode_header(msg["Subject"])[0]
+                            if isinstance(assunto, bytes):
+                                assunto = assunto.decode(encoding if encoding else "utf-8")
+                                
+                            corpo = obter_corpo_email(msg)
+                            data_email = msg.get("Date")
+                            
+                            dados_estruturados = extrair_dados_transacao(assunto, corpo, data_email)
+                            
+                            print(f"Assunto Original: {assunto}")
+                            print(f"JSON Extraido: {dados_estruturados}")
+                            print("-" * 50)
         
         mail.logout()
 
