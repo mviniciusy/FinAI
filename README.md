@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🧠💰 FinAI
+# FinAI
 
 **Inteligência Financeira Baseada em Eventos de E-mail**
 
@@ -18,23 +18,23 @@
 
 ---
 
-## 📑 Sumário
+## Sumário
 
-- [Sobre o Projeto](#-sobre-o-projeto)
-- [Funcionalidades](#-funcionalidades)
-- [Arquitetura e Hospedagem](#-arquitetura-e-hospedagem)
-- [IA Híbrida](#-ia-híbrida)
-- [Stack Tecnológica](#-stack-tecnológica)
-- [Data Pipeline](#-data-pipeline)
-- [Como Rodar](#-como-rodar)
-- [Estrutura do Projeto](#-estrutura-do-projeto)
-- [Roadmap](#-roadmap-the-roadcode)
-- [Segurança](#-segurança)
-- [Licença](#-licença)
+- [Sobre o Projeto](#sobre-o-projeto)
+- [Funcionalidades](#funcionalidades)
+- [Arquitetura e Hospedagem](#arquitetura-e-hospedagem)
+- [IA Híbrida](#ia-híbrida)
+- [Stack Tecnológica](#stack-tecnológica)
+- [Data Pipeline](#data-pipeline)
+- [Como Rodar](#como-rodar)
+- [Estrutura do Projeto](#estrutura-do-projeto)
+- [Roadmap](#roadmap-the-roadcode)
+- [Segurança](#segurança)
+- [Licença](#licença)
 
 ---
 
-## 🎯 Sobre o Projeto
+## Sobre o Projeto
 
 O FinAI automatiza a coleta de dados financeiros (**Pix, Crédito e Débito**) a partir de mensagens de e-mail dos bancos **Nubank, Inter, Mercado Pago e PicPay**, centralizando-os em um WebApp PWA que permite análise preditiva e interação via linguagem natural.
 
@@ -42,7 +42,7 @@ O sistema **não armazena credenciais bancárias** — apenas conecta ao e-mail 
 
 ---
 
-## ✨ Funcionalidades
+## Funcionalidades
 
 | Categoria | Funcionalidade |
 |-----------|---------------|
@@ -58,17 +58,17 @@ O sistema **não armazena credenciais bancárias** — apenas conecta ao e-mail 
 
 ---
 
-## 🏗️ Arquitetura e Hospedagem
+## Arquitetura e Hospedagem
 
 O FinAI opera em dois ambientes físicos distintos, separados entre desenvolvimento e produção:
 
 ```mermaid
 flowchart TB
-    subgraph Dev["💻 Ambiente de Desenvolvimento"]
+    subgraph Dev["Ambiente de Desenvolvimento"]
         DEV["Acer Nitro V15<br/>i5 13420H · 24GB DDR5<br/>VS Code + DBeaver"]
     end
 
-    subgraph Prod["🖥️ Servidor Proxmox — Xeon E5 2470v2 · 24GB ECC"]
+    subgraph Prod["Servidor Proxmox — Xeon E5 2470v2 · 24GB ECC"]
         subgraph VM["VM 200 — Debian 12 Bookworm (Docker Host)"]
             DOCKER["Docker Engine<br/>8 vCPUs · 4GB RAM"]
             PG[("PostgreSQL 15<br/>Alpine")]
@@ -79,15 +79,15 @@ flowchart TB
             OLLAMA["Ollama<br/>RTX 3060 12GB<br/>Classificador Local"]
             N8N["n8n<br/>Orquestrador"]
         end
-        HDD["💾 HD 100GB<br/>/mnt/dados<br/>Persistência Docker"]
+        HDD["HD 100GB<br/>/mnt/dados<br/>Persistência Docker"]
     end
 
-    subgraph Cloud["☁️ Serviços Cloud"]
+    subgraph Cloud["Serviços Cloud"]
         NIM["NVIDIA NIM API<br/>Extrator + Analista"]
         CF["Cloudflare Tunnels<br/>Exposição segura"]
     end
 
-    subgraph Client["📱 Cliente"]
+    subgraph Client["Cliente"]
         PWA["PWA React<br/>Dashboard + Chat"]
     end
 
@@ -129,16 +129,16 @@ O sistema **não abre portas no roteador**. A comunicação externa (WebApp PWA)
 
 ---
 
-## 📬 Estratégia de Captura de Dados por Banco
+## Estratégia de Captura de Dados por Banco
 
 A precisão da ingestão de transações depende do comportamento de notificação de cada instituição financeira. Mapeamos os seguintes padrões:
 
 | Banco | Precisão da Captura | Comportamento |
 |-------|-------------------|--------------|
-| **Inter** | 🟢 Alta | Envia e-mails detalhados (valor, data, estabelecimento) para quase todas as operações |
-| **Mercado Pago** | 🟢 Alta | Envia e-mails detalhados (valor, data, estabelecimento) para quase todas as operações |
-| **Nubank** | 🟡 Parcial | Foco em notificações Push no celular. E-mail garantido para transações Pix, mas pode falhar em compras pequenas no crédito |
-| **PicPay** | 🟡 Parcial | Foco em notificações Push no celular. E-mail garantido para transações Pix, mas pode falhar em compras pequenas no crédito |
+| **Inter** | Alta | Envia e-mails detalhados (valor, data, estabelecimento) para quase todas as operações |
+| **Mercado Pago** | Alta | Envia e-mails detalhados (valor, data, estabelecimento) para quase todas as operações |
+| **Nubank** | Parcial | Foco em notificações Push no celular. E-mail garantido para transações Pix, mas pode falhar em compras pequenas no crédito |
+| **PicPay** | Parcial | Foco em notificações Push no celular. E-mail garantido para transações Pix, mas pode falhar em compras pequenas no crédito |
 
 ### Solução de Contorno
 
@@ -150,7 +150,7 @@ Para compensar as limitações do Nubank e PicPay, duas estratégias complementa
 
 ---
 
-## 💳 Gestão de Parcelamentos e Entradas Manuais
+## Gestão de Parcelamentos e Entradas Manuais
 
 E-mails de confirmação de compra parcelada ocorrem apenas no momento da transação e **não se repetem mensalmente**. Para lidar com isso, adotamos uma solução híbrida:
 
@@ -178,18 +178,18 @@ Para suportar esta funcionalidade, foi adicionada a tabela `parcelamentos` na mo
 
 ---
 
-## 🧠 IA Híbrida
+## IA Híbrida
 
 O FinAI utiliza uma abordagem híbrida para otimizar **latência, custo e precisão**, dividindo o processamento entre a nuvem (NVIDIA NIM) e o local (Ollama com GPU RTX 3060 12GB):
 
 ```mermaid
 flowchart TB
-    subgraph Cloud_NIM["☁️ NVIDIA NIM — Cloud"]
+    subgraph Cloud_NIM["NVIDIA NIM — Cloud"]
         E1["O Extrator<br/>Modelo leve (a definir)<br/>Extração de dados do e-mail"]
         E2["O Analista<br/>Modelo pesado (a definir)<br/>Chat e projeções financeiras"]
     end
 
-    subgraph Local_Ollama["🏠 Ollama — Local · RTX 3060"]
+    subgraph Local_Ollama["Ollama — Local · RTX 3060"]
         L1["O Classificador<br/>Modelo local (a definir)<br/>Categorização de estabelecimentos"]
     end
 
@@ -214,7 +214,7 @@ flowchart TB
 
 ---
 
-## 🛠️ Stack Tecnológica
+## Stack Tecnológica
 
 | Camada | Tecnologia |
 |--------|------------|
@@ -229,7 +229,7 @@ flowchart TB
 
 ---
 
-## 📊 Data Pipeline
+## Data Pipeline
 
 O fluxo do dado segue o modelo **ETL (Extract, Transform, Load)** com uma camada adicional de **Analyze**. O sistema aceita duas fontes de dados distintas:
 
@@ -265,7 +265,7 @@ flowchart LR
 
 ---
 
-## 🚀 Como Rodar
+## Como Rodar
 
 ### Pré-requisitos
 
@@ -295,7 +295,7 @@ EMAIL_ACCOUNT=seu_email@gmail.com
 EMAIL_APP_PASSWORD=sua_senha_de_aplicativo
 ```
 
-> ⚠️ **NUNCA** commit o arquivo `.env` — ele está protegido pelo `.gitignore`.
+> **NUNCA** commit o arquivo `.env` — ele está protegido pelo `.gitignore`.
 
 ### 2. Subir o PostgreSQL
 
@@ -334,7 +334,7 @@ Conexão encerrada com segurança.
 
 ---
 
-## 📁 Estrutura do Projeto
+## Estrutura do Projeto
 
 ```
 FinAI/
@@ -356,9 +356,9 @@ FinAI/
 
 ---
 
-## 🗺️ Roadmap (The Roadcode)
+## Roadmap (The Roadcode)
 
-### Fase 1: O Extrator — MVP ✅ *Em andamento*
+### Fase 1: O Extrator — MVP *Em andamento*
 - [x] Conexão IMAP com SSL (porta 993)
 - [x] Autenticação via Senha de Aplicativo
 - [x] Validação de acesso à INBOX
@@ -401,7 +401,7 @@ FinAI/
 
 ---
 
-## 🔒 Segurança
+## Segurança
 
 | Aspecto | Medida |
 |---------|--------|
@@ -425,6 +425,6 @@ FinAI/
 
 ---
 
-## 📄 Licença
+## Licença
 
 Projeto privado. Todos os direitos reservados.
